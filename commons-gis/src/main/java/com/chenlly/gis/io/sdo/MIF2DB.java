@@ -1,0 +1,280 @@
+package com.chenlly.gis.io.sdo;
+
+import java.math.BigDecimal;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import oracle.spatial.geometry.JGeometry;
+import oracle.sql.STRUCT;
+
+import org.apache.log4j.Logger;
+
+import com.chenlly.gis.io.mif.MifFeature;
+import com.chenlly.gis.io.mif.MifReader;
+import com.chenlly.gis.io.mif.MifSchema;
+import com.chenlly.tools.util.DBUtil;
+import com.vividsolutions.jts.geom.Coordinate;
+import com.vividsolutions.jts.geom.Geometry;
+import com.vividsolutions.jts.geom.GeometryFactory;
+import com.vividsolutions.jts.geom.LinearRing;
+import com.vividsolutions.jts.geom.Polygon;
+
+/**
+ * @author ligang  ligang@mapbar.com
+ *上午9:15:10
+ */
+public class MIF2DB {
+	private static GeometryFactory gf = new GeometryFactory();
+	public static Connection conn = null;
+	public static Map<String,String> addceng = new HashMap<String,String>();
+	public static List<String> citylist = new ArrayList<String>();
+	public static List<String> tclist = new ArrayList<String>();
+	public static int treadnum = 4;
+	static String input  ="\\\\192.168.9.104\\table\\data\\input\\province.mid";
+	static String tablename = "province";
+	Logger log=Logger.getLogger("com.chenlly.tools.db.MIF2DB");
+	public static void main(String[] args){
+		
+		if(args.length>=1&&args[0]!=null){
+			input = args[0];//配置文件
+			tablename = args[1];
+			//MIF2DB.logf = args[1];
+		}
+		install();
+		
+		MIF2DB mifdb = new MIF2DB();
+		try {
+			mifdb.mifrk(input,tablename);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+
+	
+	/**
+	 * mif直接入库
+	 */
+	public void mifrk(String path,String table) throws Exception{
+		System.out.println(path+"  入库"+table+"");
+		log.info(path+"  入库"+table+"");
+		String charset = "GBK";
+		if(table.indexOf("aomen")>0){
+			charset = "UTF-8";
+		}
+		MifReader distReader = new MifReader(path,charset);
+		MifSchema mifschema = distReader.getSchema();
+		
+		//遍历字段
+		StringBuffer sqlb =  new StringBuffer("insert into "+table+"(");
+		int zdcount = mifschema.getAttributeCount();
+		for(int i=0;i<zdcount;i++){
+			String zdname = mifschema.getAttributeName(i);
+			sqlb.append(zdname+",");
+		}
+		sqlb.append("GEOLOC");
+		sqlb.append(")");
+		sqlb.append(" values(");
+		
+		for(int i=0;i<zdcount;i++){
+			sqlb.append("?,");
+		}
+		sqlb.append("?");
+		sqlb.append(")");
+		String sql = sqlb.toString();
+		String sqlnog = sql.replace(",GEOLOC)", ")");
+		sqlnog = sqlnog.replace(",?)", ")");
+		//PreparedStatement ps=MIF2DB.conn.prepareStatement(sql);
+		PreparedStatement ps=null;
+		Geometry geonull = null;
+		long rownum = 1;
+		while(distReader.hasNext()){
+			MifFeature item = distReader.next();
+			Geometry geo  = item.getGeometry();
+			if(rownum==1){
+				geonull = geo;
+				if(geonull==null){
+					 ps=MIF2DB.conn.prepareStatement(sqlnog);
+				}else{
+					 ps=MIF2DB.conn.prepareStatement(sql);
+				}
+			}
+
+			String geometrytype = "";//geo.getGeometryType().toLowerCase();
+			if(geo!=null){
+				geometrytype = geo.getGeometryType().toLowerCase();
+			}
+			JGeometry jgeo = null;	
+			if(geometrytype.equals("point")){
+				Coordinate[] coor =geo.getCoordinates();
+				double[] dd = new double[coor.length*2];
+				for(int i=0;i<coor.length;i++){
+					dd[i*2] = coor[i].x;
+					dd[i*2+1]=	coor[i].y;	
+				}
+				jgeo = JGeometry.createPoint(dd, 2, 8307);
+			}else if(geometrytype.equals("multipoint")){
+				int n = geo.getNumGeometries();
+				Object[] os = new Object[n];
+				for(int j=0;j<n;j++){
+					Geometry g1 = geo.getGeometryN(j);
+					Coordinate[] coor =g1.getCoordinates();
+					double[] dd = new double[coor.length*2];
+					for(int i=0;i<coor.length;i++){
+						dd[i*2] = coor[i].x;
+						dd[i*2+1]=	coor[i].y;	
+					}
+					os[j] = dd;
+				}
+				jgeo = JGeometry.createMultiPoint(os, 2, 8307);
+			}else if(geometrytype.equals("linestring")){
+				Coordinate[] coor =geo.getCoordinates();
+				double[] dd = new double[coor.length*2];
+				for(int i=0;i<coor.length;i++){
+					dd[i*2] = coor[i].x;
+					dd[i*2+1]=	coor[i].y;	
+				}
+				jgeo = JGeometry.createLinearLineString(dd,  2, 8307);
+			}else if(geometrytype.equals("multilinestring")){
+				int n = geo.getNumGeometries();
+				Object[] os = new Object[n];
+				for(int j=0;j<n;j++){
+					Geometry g1 = geo.getGeometryN(j);
+					Coordinate[] coor =g1.getCoordinates();
+					double[] dd = new double[coor.length*2];
+					for(int i=0;i<coor.length;i++){
+						dd[i*2] = coor[i].x;
+						dd[i*2+1]=	coor[i].y;	
+					}
+					os[j] = dd;
+				}
+				jgeo = JGeometry.createLinearMultiLineString(os, 2, 8307);
+			}else if(geometrytype.equals("polygon")){
+				Polygon poly = (Polygon)geo;
+				int n = geo.getBoundary().getNumGeometries();
+				Object[] os = new Object[n];
+
+				Geometry[] gs1 = new Geometry[n];
+				if(n==1){
+					gs1[0] = geo;
+				}else{
+					for(int j=0;j<n;j++){
+						LinearRing g1 = (LinearRing)geo.getBoundary().getGeometryN(j);
+						gs1[j] = g1;
+					}//判断包含关系，确定外环
+					for(int x=0;x<n;x++){
+						for(int y=n-1;y>=x;y--){
+							Polygon ringx = gf.createPolygon(((LinearRing)gs1[x]),null);
+							Polygon ringy = gf.createPolygon((LinearRing)gs1[y],null);
+							double areax = ringx.getArea();
+							double areay = ringy.getArea();
+							if(areay>areax){
+								Geometry tmp = gs1[x];
+								gs1[x] = gs1[y];
+								gs1[y] = tmp;
+							}
+						}
+					}
+					
+				}
+					
+				
+				for(int j=0;j<n;j++){
+					Geometry g1 = gs1[j];
+					Coordinate[] coor =g1.getCoordinates();
+					//System.out.println(j+"---"+coor.length);
+					double[] dd = new double[coor.length*2];
+					for(int i=0;i<coor.length;i++){
+						dd[i*2] =  coor[i].x;
+						dd[i*2+1]= coor[i].y;	
+					}
+					os[j] = dd;
+				}
+				jgeo = JGeometry.createLinearPolygon(os, 2, 8307);
+			}else if(geometrytype.equals("multipolygon")){//此类型四维数据中不存在
+				int n = geo.getBoundary().getNumGeometries();
+				Object[] os = new Object[n];
+				for(int j=0;j<n;j++){
+					Geometry g1 = geo.getBoundary().getGeometryN(j);
+					Coordinate[] coor =g1.getCoordinates();
+					double[] dd = new double[coor.length*2];
+					for(int i=0;i<coor.length;i++){
+						dd[i*2] = coor[i].x;
+						dd[i*2+1]=	coor[i].y;	
+					}
+					os[j] = dd;
+				}
+				jgeo = JGeometry.createLinearPolygon(os, 2, 8307);
+			}
+			STRUCT obj = null;//JGeometry.store(jgeo, conn);
+			if(jgeo!=null){
+				obj = JGeometry.store(jgeo, MIF2DB.conn);
+			}
+
+			for(int i=0;i<zdcount;i++){
+				String zdname = mifschema.getAttributeName(i);
+				String value = item.getString(zdname.toUpperCase());
+				ps.setObject(i+1, value);
+			}
+
+			if(geonull!=null){
+			    ps.setObject(zdcount+1, obj);
+			}
+			ps.addBatch();
+
+			
+
+			if(rownum%1000==0){
+				ps.executeBatch();
+				ps.close();
+				ps=null;
+				MIF2DB.conn.commit();
+				if(geonull==null){
+					ps=MIF2DB.conn.prepareStatement(sqlnog);
+				}else{
+					ps=MIF2DB.conn.prepareStatement(sql);
+				}
+				
+			}
+			rownum++;
+			}
+		
+		ps.executeBatch();
+		ps.close();
+		ps = null;
+		MIF2DB.conn.commit();
+		distReader.close();
+
+	}
+	
+	
+
+	
+	
+	public static void install(){
+		DBUtil dbutil = DBUtil.getInstance();
+		try{
+		conn = DBFactory.getConn(dbutil.getDriver(), dbutil.getUrl(), dbutil.getUser(), dbutil.getPwd());
+		}catch(Exception e){
+			e.printStackTrace();
+		}
+		
+	}
+	
+	
+	public static double douformat(double y){
+		BigDecimal bd1 = new BigDecimal(y).setScale(8,BigDecimal.ROUND_DOWN);
+        double d = bd1.doubleValue();   
+		return d;
+	}
+	
+
+}
+
+
+

@@ -1,0 +1,172 @@
+package com.mapbar.gis.shp;
+
+import java.io.File;
+import java.io.IOException;
+import java.net.MalformedURLException;
+import java.nio.charset.Charset;
+import java.util.List;
+
+import org.geotools.data.FeatureSource;
+import org.geotools.data.shapefile.ShapefileDataStore;
+import org.geotools.data.shapefile.ShpFiles;
+import org.geotools.data.shapefile.dbf.DbaseFileHeader;
+import org.geotools.data.shapefile.dbf.DbaseFileReader;
+import org.geotools.feature.FeatureCollection;
+import org.geotools.feature.FeatureIterator;
+import org.opengis.feature.simple.SimpleFeature;
+import org.opengis.feature.simple.SimpleFeatureType;
+import org.opengis.feature.type.AttributeDescriptor;
+
+import com.mapbar.gis.io.mif.MifFeature;
+import com.mapbar.gis.io.mif.MifSchema;
+import com.mapbar.gis.io.mif.MifWriter;
+import com.vividsolutions.jts.geom.Geometry;
+
+/**
+ * 
+ * Class Shp2Mif.java
+ * 
+ * Description
+ * 
+ * Company mapbar
+ * 
+ * author Chenll E-mail: Chenll@mapbar.com
+ * 
+ * Version 1.0
+ * 
+ * Date 2012-12-10 下午05:28:35
+ */
+public class Shp2Mif {
+
+	private static final String THE_GEOM = "the_geom";
+	
+	/**
+	 * 获取Meta
+	 * @return
+	 */
+	public String getMeta() {
+		StringBuffer buf = new StringBuffer();
+		buf.append("Version 300").append("\r\n");
+		buf.append("Charset \"WindowsSimpChinese\"").append("\r\n");
+		buf.append("Delimiter \",\"").append("\r\n");
+		buf.append("CoordSys Earth Projection 1, 0").append("\r\n");
+		return buf.toString();
+
+	}
+	
+	/**
+	 * argGIS mif 类型转换
+	 * @param c
+	 * @param length
+	 * @return
+	 */
+	public String getType(char c,int decimalCount, int length) {
+		if (c == 'C') {
+			return "char(" + length + ")";
+		}
+		if (c == 'N') {
+			if(decimalCount==0) {
+				if(length<9) {
+					//短整型
+					return "Smallint";
+				} else {
+					//长整型
+					return "Integer";
+				}
+			} else {
+				return "decimal(" + length + "," +decimalCount+")";
+			}
+		}
+		if(c == 'F') {
+			return "Float";
+		}
+		
+		if(c == 'D') {
+			return "Date";
+		}
+		// TODO
+		return "";
+	}
+	
+	/**
+	 * 获取Schema
+	 * @param path
+	 * @return
+	 */
+	public MifSchema createSchema(String path) {
+		MifSchema schema = new MifSchema();
+		DbaseFileReader reader = null;
+		try {
+			reader = new DbaseFileReader(new ShpFiles(path), false,
+					Charset.forName("GBK"));
+			DbaseFileHeader header = reader.getHeader();
+			int numFields = header.getNumFields();
+			for (int i = 0; i < numFields; i++) {
+				schema.addAttribute(header.getFieldName(i),getType(header.getFieldType(i),header.getFieldDecimalCount(i),header.getFieldLength(i)));
+			}
+		} catch (Exception ex) {
+			System.out.println("[读取文件异常]"+path);
+			ex.printStackTrace();
+		} finally {
+			if (reader != null) {
+				// 关闭
+				try {
+					reader.close();
+				} catch (Exception e) {
+					System.out.println("[读取文件异常]"+path);
+				}
+			}
+		}
+		return schema;
+	}
+	
+
+	/**
+	 * 
+	 * @param shpPath  shp 文件路径
+	 * @param mifPath  mif 文件路径
+	 */
+	public void transition(String shpPath, String mifPath) {
+		MifWriter mw = new MifWriter(mifPath);
+		MifSchema schema = createSchema(shpPath.replace(".shp", ".dbf"));
+		mw.writeln(MifWriter.WType.MIF, schema.toString());
+		try {
+			ShapefileDataStore shpDataStore = new ShapefileDataStore(new File(
+					shpPath).toURI().toURL());
+			shpDataStore.setStringCharset(Charset.forName("GBK"));
+			String typeName = shpDataStore.getTypeNames()[0];
+			FeatureSource<SimpleFeatureType, SimpleFeature> reader = shpDataStore.getFeatureSource(typeName);
+			SimpleFeatureType featureType = reader.getSchema();
+			List<AttributeDescriptor> columns = featureType.getAttributeDescriptors();
+			FeatureCollection<SimpleFeatureType, SimpleFeature> collection = reader.getFeatures();
+			for (FeatureIterator<SimpleFeature> iterator = collection.features();iterator.hasNext();) {
+				MifFeature item = new MifFeature(schema);
+				SimpleFeature feature = iterator.next();
+				for (AttributeDescriptor attributeDes : columns) {
+					String attributeName = attributeDes.getName().toString();
+					if (attributeName.equals(THE_GEOM))
+						continue;
+					item.setAttribute(attributeName,feature.getAttribute(attributeName));
+				}
+				Geometry g = (Geometry) feature.getDefaultGeometry();
+				item.setGeometry(g);
+				mw.writeln(MifWriter.WType.MIF, item.toMifString());
+				mw.writeln(MifWriter.WType.MID, item.toMidString());
+			}
+		} catch (MalformedURLException e) {
+			System.out.println("[读取文件异常]"+shpPath);
+			e.printStackTrace();
+		} catch (IOException e) {
+			System.out.println("[读取文件异常]"+shpPath);
+			e.printStackTrace();
+		}
+		mw.close();
+	}
+	
+	public static void main(String[] args) {
+		String shpPath = "E:\\arcgis\\beijing111\\1km地铁站试验2.shp";
+		String mifPath = "C:\\Documents and Settings\\chenll\\桌面\\beijing111\\北京地铁八通线.shp";
+		Shp2Mif a = new Shp2Mif();
+		a.transition(shpPath, mifPath);
+	}
+}

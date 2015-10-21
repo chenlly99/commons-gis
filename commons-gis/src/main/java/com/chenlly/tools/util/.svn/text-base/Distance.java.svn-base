@@ -1,0 +1,70 @@
+package com.mapbar.tools.util;
+
+/**
+ * 计算球面距离
+ * @author chenll
+ *
+ */
+public class Distance {
+	/**
+	 * 计算两个经纬度之间的长度(是长度，不是距离)
+	 * @param lat1
+	 * @param lng1
+	 * @param lat2
+	 * @param lng2
+	 * @return
+	 */
+	public static double getDistance(double lat1, double lng1, double lat2,double lng2) {
+		if(lat1<=0D || lng1<=0D || lat2<=0D || lng2<=0D){
+			throw new RuntimeException("[经纬度值必须大于0]");
+		}
+		double radLat1 = rad(lat1);
+		double radLat2 = rad(lat2);
+		double a = radLat1 - radLat2;
+		double b = rad(lng1) - rad(lng2);
+		double s = 2 * Math.asin(Math.sqrt(Math.pow(Math.sin(a / 2), 2)
+				+ Math.cos(radLat1) * Math.cos(radLat2)
+				* Math.pow(Math.sin(b / 2), 2)));
+		s = s * EARTH_RADIUS;
+		s = Math.round(s * 10000) / 10000.0;
+		return s;
+	}
+		
+	/**
+	 * 计算两个经纬度之间的长度(是长度，不是距离)
+	 * @param lat1
+	 * @param lng1
+	 * @param lat2
+	 * @param lng2
+	 * @return
+	 */
+	public static double getDistance(String point1,String point2){
+		if(point1==null || "".equals(point1)||point2==null || "".equals(point2)){
+			throw new RuntimeException("[经纬度值不能为空]");
+		}
+		String[] pointArr1 = point1.split(" ");
+		String[] pointArr2 = point2.split(" ");
+		double lng1 = Double.parseDouble(pointArr1[0]);  //x1
+		double lng2 = Double.parseDouble(pointArr2[0]);  //x2
+		double lat1 = Double.parseDouble(pointArr1[1]);   //y1
+		double lat2 = Double.parseDouble(pointArr2[1]);   //y2
+		double radLat1 = rad(lat1);
+		double radLat2 = rad(lat2);
+		double a = radLat1 - radLat2;
+		double b = rad(lng1) - rad(lng2);
+		double s = 2 * Math.asin(Math.sqrt(Math.pow(Math.sin(a / 2), 2)
+				+ Math.cos(radLat1) * Math.cos(radLat2)
+				* Math.pow(Math.sin(b / 2), 2)));
+		s = s * EARTH_RADIUS;
+		s = Math.round(s * 10000) / 10000.0;
+		return s;
+	}
+	
+	private static double EARTH_RADIUS = 6378137.0; // 单位m
+	
+	private static double rad(double d) {
+		return d * Math.PI / 180.0;
+	}
+
+
+}
