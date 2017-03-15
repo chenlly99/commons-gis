@@ -1,0 +1,30 @@
+package com.opengis.tools.util;
+
+/**
+ * 
+ * Class Constant.java
+ * 
+ * Description
+ * 
+ * Company mapbar
+ * 
+ * author Chenll E-mail: Chenll@mapbar.com
+ * 
+ * Version 1.0
+ * 
+ * Date 2012-4-6 上午11:03:43
+ */
+public class Constant {
+	public static String ADMIN_NAME = "ADMINNAME";
+	public static String ADMIN_CODE = "ADMINCODE";
+	public static String ADMIN_TABLE = "PROVINCE";
+	public static String ADMIN_PY = "PINYIN";
+	public static String GEOLOC = "GEOLOC";
+	
+	//4.0
+	public static String SEA_TABLE0 = "SEABOUNDS0";
+	//主站
+	public static String SEA_TABLE1 = "SEABOUNDS1";
+	
+	public static Integer SCALE = 1000000;
+}

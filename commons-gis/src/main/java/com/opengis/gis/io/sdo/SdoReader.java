@@ -1,0 +1,123 @@
+package com.opengis.gis.io.sdo;
+
+
+/**
+ * 
+ * @author chenlly(chenlly@126.com)
+ * 
+ */
+
+/**
+public class SdoReader implements Iterator<MifFeature> {
+
+	private String sql;
+	private Connection conn;
+	public Connection getConn() {
+		return conn;
+	}
+
+	private ResultSet rs;
+	private Statement stat;
+	private MifSchema schema;
+	private static String GEOMETRY = "geoloc";
+
+	public SdoReader(Connection conn, String sql) {
+		this.conn = conn;
+		this.sql = sql;
+		
+
+		if (conn == null || sql == null) {
+			throw new RuntimeException("conn or sql is null!");
+		}
+		if (sql.toLowerCase().indexOf(GEOMETRY) == -1) {
+			throw new RuntimeException("sql is invalid!" + sql);
+		}
+		try {
+			this.stat = this.conn.createStatement();
+			this.rs = this.stat.executeQuery(this.sql);
+			schema = new MifSchema();
+			ResultSetMetaData rmd = rs.getMetaData();
+			for (int i = 1; i <= rmd.getColumnCount(); i++) {
+				String type = rmd.getColumnTypeName(i);
+				if (!type.equals("MDSYS.SDO_GEOMETRY")) {
+					if (type.indexOf("CHAR") >= 0 || type.equals("CLOB")
+							|| type.equals("DATE")) {
+						if(rmd.getPrecision(i)==0){
+							type = "Char(150)";
+						} else {
+							type = "Char(" + rmd.getPrecision(i) + ")";
+						}
+					} else if (type.indexOf("INT") >= 0) {
+						type = "Integer";
+					} else if (type.indexOf("FLOAT") >= 0) {
+						type = "Float";
+					} else if (type.indexOf("DOUBLE") >= 0
+							|| type.indexOf("LONG") >= 0
+							|| type.equals("NUMBER") || type.equals("DECIMAL")
+							|| type.equals("NUMERIC")) {
+						int scale = rmd.getScale(i);
+						if (scale < 0) {
+							type = "Decimal(36, 6)";
+						} else {
+							type = "Decimal(" + rmd.getPrecision(i) + ", "
+									+ scale + ")";
+						}
+					}
+					// TODO
+					schema.addAttribute(rmd.getColumnName(i), type);
+				}
+			}
+		} catch (SQLException e) {
+			throw new RuntimeException("executeQuery error: ", e);
+		}
+	}
+
+	public boolean hasNext() {
+		try {
+			return rs.next();
+		} catch (SQLException e) {
+			throw new RuntimeException("sdo hasNext error:", e);
+		}
+	}
+
+	public MifFeature next() {
+		MifFeature item = new MifFeature(schema);
+		// set attribute
+		for (int i = 0; i < schema.getAttributeCount(); i++) {
+			try {
+				String val = rs.getString(schema.getAttributeName(i));
+				item.setAttribute(i, val);
+			} catch (SQLException e) {
+				throw new RuntimeException("get attribute error", e);
+			}
+		}
+		// set geometry
+		try {
+			Geometry geo = new OraReader()
+					.read((STRUCT) rs.getObject(GEOMETRY));
+			item.setGeometry(geo);
+		} catch (SQLException e) {
+			throw new RuntimeException("get Geometry error", e);
+		}
+		return item;
+	}
+
+	public void remove() {
+		// do nothing
+	}
+
+	public MifSchema getSchema() {
+		return schema;
+	}
+
+	public void close() {
+		try {
+			rs.close();
+			stat.close();
+		} catch (SQLException e) {
+			throw new RuntimeException("close rs error!", e);
+		}
+	}
+
+}
+**/

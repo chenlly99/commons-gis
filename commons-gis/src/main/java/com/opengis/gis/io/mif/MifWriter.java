@@ -1,0 +1,152 @@
+package com.opengis.gis.io.mif;
+
+import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.OutputStreamWriter;
+import java.io.Writer;
+import java.util.Iterator;
+
+
+
+import com.opengis.gis.geo.Feature;
+import com.opengis.gis.geo.FeatureCollection;
+
+
+
+
+/**
+ * 
+ * @author chenlly(chenlly@126.com)
+ * 
+ */
+public class MifWriter {
+
+	public enum WType {
+		MIF, MID
+	}
+
+	private Writer mid;
+	private Writer mif;
+	
+	public MifWriter(String file,String charset) {
+		this(file, charset, true);
+	}
+
+	public MifWriter(String file) {
+		this(file, "GBK", true);
+	}
+
+	public MifWriter(String file, boolean append) {
+		this(file, "GBK", append);
+	}
+
+	public MifWriter(String file, String charset, boolean append) {
+		try {
+			File f = new File(file);
+			if (!f.exists()) {
+				if (!f.getParentFile().exists()) {
+					f.getParentFile().mkdirs();
+				}
+				// f.createNewFile();
+			}
+			String uc = file.toUpperCase();
+			if (uc.endsWith(".MID") || uc.endsWith(".MIF")) {
+				file = file.substring(0, file.length() - 4);
+			}
+
+			mid = new OutputStreamWriter(new FileOutputStream(file + ".MID",
+					append), charset);
+			mif = new OutputStreamWriter(new FileOutputStream(file + ".MIF",
+					append), "GBK");
+		} catch (Exception e) {
+			throw new RuntimeException("build MifWriter error: ", e);
+		}
+	}
+
+	public void write(FeatureCollection fc) {
+		if (fc == null || fc.size() == 0)
+			return;
+		if (fc.getSchema() instanceof MifSchema) {
+			this.writeln(WType.MIF, ((MifSchema) fc.getSchema()).toString());
+			for (Iterator<Feature> i = fc.iterator(); i.hasNext();) {
+				MifFeature f = (MifFeature) i.next();
+				this.writeln(WType.MID, f.toMidString());
+				this.writeln(WType.MIF, f.toMifString());
+			}
+		}
+		this.close();
+	}
+
+	public synchronized void writeln(WType type, String message) {
+		//System.out.println("++"+message+"++"+message.getBytes().length);
+		//message = message.replace("\r", "");
+		//message = message.replace("\n", "\r\n");
+		//System.out.println("--"+message+"--"+message.getBytes().length);
+		if (type == WType.MID && mid != null) {
+			try {
+				mid.append(message + "\r\n");
+			} catch (IOException e) {
+				throw new RuntimeException("write mid message error: ", e);
+			}
+		} else if (type == WType.MIF && mif != null) {
+			try {
+				mif.append(message + "\r\n");
+			} catch (IOException e) {
+				throw new RuntimeException("write mif message error: ", e);
+			}
+		}
+	}
+	
+/*	public synchronized void write(WType type, String message) {
+		System.out.println("++"+message);
+		message = message.replace("\r", "");
+		message = message.replace("\n", "\r\n");
+		System.out.println("--"+message);
+		if (type == WType.MID && mid != null) {
+			try {
+				mid.append(message+"\r\n" );
+			} catch (IOException e) {
+				throw new RuntimeException("write mid message error: ", e);
+			}
+		} else if (type == WType.MIF && mif != null) {
+			try {
+				mif.append(message );
+			} catch (IOException e) {
+				throw new RuntimeException("write mif message error: ", e);
+			}
+		}
+	}*/
+	
+	public void flush() {
+		if (mid != null) {
+			try {
+				mid.flush();
+			} catch (IOException e) {
+			}
+		}
+		if (mif != null) {
+			try {
+				mif.flush();
+			} catch (IOException e) {
+			}
+		}
+	
+	}
+
+	public void close() {
+		if (mid != null) {
+			try {
+				mid.close();
+			} catch (IOException e) {
+			}
+		}
+		if (mif != null) {
+			try {
+				mif.close();
+			} catch (IOException e) {
+			}
+		}
+	}
+
+}
