@@ -36,6 +36,25 @@ public class Grid {
 		return first+""+second+""+third+""+fourth;
 	}
 	
+	public static String getMinMaxLonLat(String mapid){
+		if(mapid==null || mapid.length()!=6) {
+			System.out.println("Error:"+"mapid length not eq 6");
+		}
+		int m1 = Integer.parseInt(mapid.substring(0,1));
+		int m2 = Integer.parseInt(mapid.substring(1,2));
+		int m3 = Integer.parseInt(mapid.substring(2,3));
+		int m4 = Integer.parseInt(mapid.substring(3,4));
+		int m5 = Integer.parseInt(mapid.substring(4,5));
+		int m6 = Integer.parseInt(mapid.substring(5,6));
+		double xMin = Arith.div((m3*10+m4+60)*3600+m6*450,3600,6);
+		double xMax = Arith.div((m3*10+m4+60)*3600+(m6+1)*450,3600,6);
+		double yMin = Arith.div((m1*10+m2)*2400+m5*300,3600,6);
+		double yMax = Arith.div((m1*10+m2)*2400+(m5+1)*300,3600,6);
+		return xMin+","+yMin+";"+xMax+","+yMax;
+	}
+	
+
+	
 	/**
 	 * 计算相邻8个网格的mapID
 	 * @param mapID
@@ -85,6 +104,6 @@ public class Grid {
 	
 	public static void main(String[] args){
 		//445625
-		System.out.println(adjoinMapID("475762"));
+		System.out.println(getMinMaxLonLat("545956"));
 	}
 }
